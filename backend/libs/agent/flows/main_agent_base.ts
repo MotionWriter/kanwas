@@ -42,12 +42,14 @@ export function createMainAgentFlowDefinition(
     buildTools: (context) => {
       const nativeTools = createNativeTools(context)
       const skillInvokeTool = createSkillInvokeTool(getSkillToolDescription())
+      const { web_search: webSearch, web_fetch: webFetch, ...availableUtilityTools } = utilityTools
 
       return {
         ...(options.provider.name === 'openai' ? {} : { progress: progressTool }),
         start_task: startTaskTool,
         ...nativeTools,
-        ...utilityTools,
+        ...availableUtilityTools,
+        ...(context.webSearchService?.enabled !== false ? { web_search: webSearch, web_fetch: webFetch } : {}),
         ...(options.includeSuggestNextTasksTool ? { [SUGGEST_NEXT_TASKS_TOOL_NAME]: suggestNextTasksTool } : {}),
         skill: skillInvokeTool,
         create_skill: createSkillTool,

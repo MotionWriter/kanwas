@@ -1,7 +1,8 @@
 import { ToolLoopAgent, type ModelMessage, type PrepareStepFunction, type StepResult, type ToolSet } from 'ai'
-import type { AgentProviderCallOptions } from './providers/types.js'
+import type { AgentProviderCallOptions, ProviderConfig } from './providers/types.js'
 import type { ToolContext } from './tools/context.js'
 import { captureToolCallSpansFromStep } from './tracing/tool_spans.js'
+import { consumeSuccessfulStream } from './utils/tool_call_repair.js'
 
 export interface ToolLoopRunnerTrace {
   parentId?: string
@@ -20,6 +21,7 @@ export interface ToolLoopRunnerOptions {
   stopWhen: unknown
   context: ToolContext
   providerOptions?: AgentProviderCallOptions
+  authMode?: ProviderConfig['authMode']
   repairToolCall?: unknown
   formatMessages?: (messages: ModelMessage[]) => ModelMessage[]
   prepareStep?: PrepareStepFunction
@@ -78,8 +80,12 @@ export async function runToolLoop(options: ToolLoopRunnerOptions): Promise<ToolL
       abortSignal: options.context.abortSignal,
     })
 
-    for await (const chunk of stream.fullStream) {
-      options.onChunk?.(chunk)
+    if (options.authMode === 'chatgpt-plan') {
+      await consumeSuccessfulStream(stream, options.onChunk)
+    } else {
+      for await (const chunk of stream.fullStream) {
+        options.onChunk?.(chunk)
+      }
     }
     const [response, steps] = await Promise.all([stream.response, stream.steps])
 

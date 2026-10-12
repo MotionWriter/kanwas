@@ -33,6 +33,13 @@ Kanwas is a multiplayer workspace for AI work. Teams and an AI agent share the s
 
 ## Quickstart
 
+To try this fork's canvas locally, use [the trial launcher](docs/LOCAL_TRIAL.md).
+
+This fork adds experimental [local ChatGPT subscription access](docs/CHATGPT_PLAN.md).
+Read that guide to use subscription authorization instead of an OpenAI API key.
+Live sign-in and a direct subscription text response have been verified;
+a complete board-edit workflow still needs validation.
+
 ### Prerequisites
 
 - Docker + Docker Compose

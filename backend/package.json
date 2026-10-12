@@ -37,7 +37,15 @@
     "typecheck": "tsc --noEmit",
     "migrate": "node ace migration:run --force",
     "codegen": "node ace tuyau:generate",
-    "set-env-var": "node scripts/railway/set-env-var.js"
+    "set-env-var": "node scripts/railway/set-env-var.js",
+    "chatgpt:signin": "node --import tsx scripts/chatgpt_plan_auth.ts signin",
+    "chatgpt:status": "node --import tsx scripts/chatgpt_plan_auth.ts status",
+    "chatgpt:disconnect": "node --import tsx scripts/chatgpt_plan_auth.ts disconnect",
+    "chatgpt:models": "node --import tsx scripts/chatgpt_plan_auth.ts models",
+    "chatgpt:probe": "node --import tsx scripts/chatgpt_plan_auth.ts probe",
+    "test:chatgpt-plan": "node --import tsx --test tests/chatgpt-plan/*.test.ts",
+    "typecheck:chatgpt-plan": "tsc --noEmit -p tsconfig.chatgpt-plan.json",
+    "chatgpt:recover-lock": "node --import tsx scripts/chatgpt_plan_auth.ts recover-lock"
   },
   "imports": {
     "#commands/*": "./commands/*.js",
@@ -118,6 +126,7 @@
     "e2b": "^2.14.1",
     "googleapis": "^161.0.0",
     "ioredis": "^5.8.0",
+    "jose": "^6.1.3",
     "jsdom": "^27.0.0",
     "luxon": "^3.7.2",
     "mime": "^4.1.0",

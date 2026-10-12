@@ -1,6 +1,7 @@
 import { Composio } from '@composio/core'
 import { inject } from '@adonisjs/core'
 import env from '#start/env'
+import { MissingServiceConfigurationError } from './missing_service_configuration.js'
 import { ContextualLogger } from '#services/contextual_logger'
 import { validateConnectionCallbackUrl } from './composio/callback_url_policy.js'
 import {
@@ -89,13 +90,18 @@ function slackUserCacheKey(workspaceId: string, slackUserId: string): string {
 
 @inject()
 export default class ComposioService {
-  private composio: Composio
+  private composioInstance?: Composio
   private readonly logger = ContextualLogger.createFallback({ component: 'ComposioService' })
 
-  constructor() {
-    this.composio = new Composio({
-      apiKey: env.get('COMPOSIO_API_KEY'),
-    })
+  assertConfigured(): void {
+    if (!env.get('COMPOSIO_API_KEY')?.trim()) {
+      throw new MissingServiceConfigurationError('External integrations', 'COMPOSIO_API_KEY')
+    }
+  }
+
+  private get composio(): Composio {
+    this.assertConfigured()
+    return (this.composioInstance ??= new Composio({ apiKey: env.get('COMPOSIO_API_KEY')!.trim() }))
   }
 
   private async createSession(userId: string, workspaceId: string) {

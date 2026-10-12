@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "libs/chatgpt-plan-auth/**/*.ts",
+    "libs/agent/providers/chatgpt_plan*.ts",
+    "scripts/chatgpt_plan_auth.ts",
+    "tests/chatgpt-plan/**/*.ts"
+  ],
+  "exclude": ["node_modules", "build"]
+}

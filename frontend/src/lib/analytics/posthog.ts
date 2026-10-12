@@ -1,10 +1,11 @@
 import posthog from 'posthog-js'
 import { POSTHOG_HOST, POSTHOG_KEY } from '@/lib/analytics/config'
+import { isLocalTrial } from '@/lib/localTrialSession'
 
 const posthogKey = POSTHOG_KEY
 const posthogHost = POSTHOG_HOST
 
-export const isPostHogEnabled = typeof window !== 'undefined' && Boolean(posthogKey)
+export const isPostHogEnabled = typeof window !== 'undefined' && Boolean(posthogKey) && !isLocalTrial
 
 if (isPostHogEnabled && posthogKey) {
   posthog.init(posthogKey, {

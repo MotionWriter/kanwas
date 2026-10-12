@@ -14,6 +14,7 @@ import {
   toolkitsQueryValidator,
 } from '#validators/connection'
 import { toError } from '#services/error_utils'
+import { MissingServiceConfigurationError } from '#services/missing_service_configuration'
 
 @inject()
 export default class ConnectionsController {
@@ -90,6 +91,7 @@ export default class ConnectionsController {
       const requirements = await this.composioService.getCustomAuthRequirements(toolkit)
       return requirements
     } catch (error) {
+      if (error instanceof MissingServiceConfigurationError) throw error
       if (error instanceof ToolkitRequiredError) {
         return this.badRequest(response, 'TOOLKIT_REQUIRED', error.message)
       }
@@ -133,6 +135,7 @@ export default class ConnectionsController {
         connectedAccountId: result.connectedAccountId,
       }
     } catch (error) {
+      if (error instanceof MissingServiceConfigurationError) throw error
       if (error instanceof ToolkitRequiredError) {
         return this.badRequest(response, 'TOOLKIT_REQUIRED', error.message)
       }
@@ -151,6 +154,7 @@ export default class ConnectionsController {
             requirements,
           })
         } catch (requirementsError) {
+          if (requirementsError instanceof MissingServiceConfigurationError) throw requirementsError
           logger.error(
             {
               operation: 'connections.initiate_custom_auth_requirements_failed',
@@ -203,6 +207,7 @@ export default class ConnectionsController {
 
       return { success: true }
     } catch (error) {
+      if (error instanceof MissingServiceConfigurationError) throw error
       if (error instanceof ConnectionNotInWorkspaceError) {
         return response.notFound({
           error: 'Connection not found',

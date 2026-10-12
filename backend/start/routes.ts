@@ -2,6 +2,7 @@ import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
 const AuthController = () => import('#controllers/auth_controller')
+const LocalTrialController = () => import('#controllers/local_trial_controller')
 const CliAuthController = () => import('#controllers/cli_auth_controller')
 const EmbedsController = () => import('#controllers/embeds_controller')
 const WorkspacesController = () => import('#controllers/workspaces_controller')
@@ -27,6 +28,10 @@ const UserConfigController = () => import('#controllers/user_config_controller')
 const SlackMessageController = () => import('#controllers/slack_message_controller')
 
 // CLI auth (code + poll are public, authorize requires auth)
+// These endpoints require development trial mode and one-use local launcher secrets.
+router.post('/local-trial/bootstrap', [LocalTrialController, 'bootstrap']).as('localTrial.bootstrap')
+router.post('/local-trial/session', [LocalTrialController, 'session']).as('localTrial.session')
+
 router
   .group(() => {
     router.post('/code', [CliAuthController, 'createCode']).as('cli.code')

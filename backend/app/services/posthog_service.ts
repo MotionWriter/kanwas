@@ -113,10 +113,14 @@ function compactProperties(properties: Record<string, unknown>): Record<string, 
 }
 
 export default class PostHogService {
-  private readonly client: PostHog
+  private readonly client: PostHog | null
   private readonly logger = ContextualLogger.createFallback({ component: 'PostHogService' })
 
   constructor() {
+    if (process.env.KANWAS_LOCAL_TRIAL === 'true') {
+      this.client = null
+      return
+    }
     this.client = new PostHog(POSTHOG_API_KEY, {
       host: POSTHOG_HOST,
       flushAt: 20,
@@ -136,6 +140,7 @@ export default class PostHogService {
       setOnce?: Record<string, unknown>
     } = {}
   ): void {
+    if (!this.client) return
     const nowIso = new Date().toISOString()
     const setProperties = compactProperties({
       email: payload.email,
@@ -174,6 +179,7 @@ export default class PostHogService {
   }
 
   trackWorkspaceViewed(payload: WorkspaceViewedTrackingPayload): void {
+    if (!this.client) return
     const nowIso = new Date().toISOString()
 
     this.identifyUser(
@@ -255,6 +261,7 @@ export default class PostHogService {
   }
 
   wrapModelWithTracing<TModel>(model: TModel, options: AiModelTracingOptions): TModel {
+    if (!this.client) return model
     return withTracing(model as any, this.client, {
       posthogDistinctId: options.distinctId,
       posthogTraceId: options.traceId,
@@ -335,6 +342,7 @@ export default class PostHogService {
     event: '$ai_trace' | '$ai_span' | '$ai_generation',
     properties: Record<string, unknown>
   ): void {
+    if (!this.client) return
     try {
       this.client.capture({
         distinctId: identity.distinctId,
@@ -373,6 +381,7 @@ export default class PostHogService {
   }
 
   async shutdown(): Promise<void> {
+    if (!this.client) return
     try {
       await this.client.shutdown()
     } catch (error) {

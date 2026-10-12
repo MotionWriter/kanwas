@@ -65,6 +65,7 @@ export default class WorkspaceSuggestedTaskGenerationService {
       const userConfig = await this.userConfigService.getConfig(input.triggeringUserId)
       const provider = resolveProviderFromUserConfig(userConfig, {
         logger,
+        userId: input.triggeringUserId,
       })
       agent.overrideProvider(provider)
       const flow = this.buildFlow(provider)

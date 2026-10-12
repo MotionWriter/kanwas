@@ -20,6 +20,16 @@ import {
 } from 'shared/llm-config'
 import { createAnthropicProvider } from './anthropic.js'
 import { createOpenAIProvider } from './openai.js'
+import { createChatGPTPlanProvider } from './chatgpt_plan.js'
+
+export interface ProviderCredentialConfig {
+  anthropicApiKey?: string
+  openaiApiKey?: string
+  openaiBaseUrl?: string
+  openaiAuthMode?: 'api-key' | 'chatgpt-plan'
+  chatgptPlanUserId?: string
+  chatgptPlanModel?: string
+}
 
 export function createProvider(
   name: ProviderName,
@@ -48,12 +58,21 @@ const API_KEY_MAP: Record<ProviderName, string> = {
  * Default provider is anthropic. Per-user override via llmProvider in user config.
  */
 export function createProviderFromConfig(
-  config: { anthropicApiKey?: string; openaiApiKey?: string; openaiBaseUrl?: string },
+  config: ProviderCredentialConfig,
   selection: ProviderSelection = {},
   runtimeOptions: ProviderRuntimeOptions = {}
 ): ProviderConfig {
   const normalizedProvider = normalizeLlmProvider(selection.provider)
   const providerName = normalizedProvider ?? DEFAULT_LLM_PROVIDER
+  if (config.openaiAuthMode === 'chatgpt-plan') {
+    if (providerName !== 'openai') {
+      throw new Error('ChatGPT plan mode requires OpenAI. API-key providers are disabled in this mode.')
+    }
+    if (config.openaiBaseUrl) {
+      throw new Error('ChatGPT plan mode uses the official OpenAI endpoint; remove OPENAI_BASE_URL.')
+    }
+    return createChatGPTPlanProvider(config, selection, runtimeOptions)
+  }
   const keyField = API_KEY_MAP[providerName]
   const apiKey = config[keyField as keyof typeof config] as string | undefined
 

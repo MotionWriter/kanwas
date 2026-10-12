@@ -1,8 +1,8 @@
-import { generateText, stepCountIs, type ModelMessage, type ToolSet } from 'ai'
+import { stepCountIs, type ModelMessage, type ToolSet } from 'ai'
 import { z } from 'zod'
 import type { ToolContext } from './tools/context.js'
 import { promptManager } from './prompt_manager.js'
-import { createToolCallReaskRepair } from './utils/tool_call_repair.js'
+import { createToolCallReaskRepair, generateTextForProvider } from './utils/tool_call_repair.js'
 import { createSpanId, isAbortError, withToolCallTraceContext, type TraceContext } from './tracing/posthog.js'
 import type PostHogService from '#services/posthog_service'
 import { type FlowSystemPromptBlock } from './flow.js'
@@ -243,6 +243,7 @@ export class LLM {
       },
       tools: allTools as ToolSet,
       providerOptions: resolvedProviderOptions,
+      authMode: this.provider.authMode,
     })
 
     const streamingHandlers = createMainToolLoopStreamingHandlers(baseToolExecutionContext)
@@ -255,6 +256,7 @@ export class LLM {
     try {
       const runResult = await runToolLoop({
         model: rawModel,
+        authMode: this.provider.authMode,
         tools: allTools as ToolSet,
         messages: sanitizedMessages,
         instructions: systemMessages,
@@ -399,15 +401,18 @@ export class LLM {
       execute: async (input: T) => input,
     }
 
-    const result = await generateText({
-      model: model as any,
-      system: compiledSystemPrompt,
-      messages: messages as any,
-      providerOptions: this.provider.generationOptions({ modelId: this.modelName, flowHint: 'plan' }) as any,
-      tools: { structured_response: structuredResponseTool } as any,
-      toolChoice: { type: 'tool', toolName: 'structured_response' },
-      stopWhen: stepCountIs(1),
-    })
+    const result = await generateTextForProvider(
+      {
+        model: model as any,
+        system: compiledSystemPrompt,
+        messages: messages as any,
+        providerOptions: this.provider.generationOptions({ modelId: this.modelName, flowHint: 'plan' }) as any,
+        tools: { structured_response: structuredResponseTool } as any,
+        toolChoice: { type: 'tool', toolName: 'structured_response' },
+        stopWhen: stepCountIs(1),
+      },
+      { authMode: this.provider.authMode }
+    )
 
     // Extract from tool call
     const toolCall = result.steps[0]?.toolCalls?.[0]
@@ -484,6 +489,7 @@ export class LLM {
         toolCallId: options.toolCallId,
       },
       {
+        authMode: this.provider.authMode,
         createModel: (modelId) => this.provider.createModel(modelId),
         wrapModelWithTrace: (model, context, traceContext, properties) =>
           this.wrapModelWithTrace(model, context, traceContext, properties),

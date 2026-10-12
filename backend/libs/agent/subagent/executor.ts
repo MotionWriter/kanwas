@@ -24,7 +24,7 @@ import {
   type ReportOutputState,
 } from './streaming.js'
 import { runToolLoop } from '../tool_loop_runner.js'
-import type { AgentProviderCallOptions } from '../providers/types.js'
+import type { AgentProviderCallOptions, ProviderConfig } from '../providers/types.js'
 import { buildOpenAIThreadContext } from '../providers/runtime_options.js'
 
 export interface SubagentExecutionInput {
@@ -51,6 +51,7 @@ export interface SubagentSpanPayload {
 }
 
 export interface SubagentExecutionDependencies {
+  authMode?: ProviderConfig['authMode']
   createModel: (modelId: string) => unknown
   wrapModelWithTrace: <TModel>(
     model: TModel,
@@ -184,6 +185,7 @@ export async function runSubagentExecution(
       },
       tools: tools as ToolSet,
       providerOptions: resolvedProviderOptions,
+      authMode: dependencies.authMode,
     })
 
     const reportState: ReportOutputState = { itemId: null, argsText: '', activeToolCallId: null }
@@ -192,6 +194,7 @@ export async function runSubagentExecution(
 
     const runResult = await runToolLoop({
       model: rawModel,
+      authMode: dependencies.authMode,
       tools: tools as ToolSet,
       messages: [{ role: 'user', content: subagentFlow.buildUserPrompt({ workspaceTree }) } as ModelMessage],
       instructions: dependencies.toSystemMessages(formatSubagentSystemMessages(subagentFlow, objective)),

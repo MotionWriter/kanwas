@@ -43,6 +43,7 @@ export default class TaskTitleService {
     const userConfig = await this.userConfigService.getConfig(userId)
     const provider = resolveProviderFromUserConfig(userConfig, {
       logger: this.logger,
+      userId,
     })
     const llm = new LLM({
       provider,

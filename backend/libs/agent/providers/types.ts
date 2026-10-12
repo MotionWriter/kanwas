@@ -39,6 +39,8 @@ export interface ProviderOverrideOptions {
 
 export interface ProviderRuntimeOptions {
   logger?: ContextualLoggerContract
+  userId?: string
+  fetch?: typeof fetch
 }
 
 export interface ProviderSelection {
@@ -58,6 +60,8 @@ export interface ProviderGenerationOptionsInput {
 }
 
 export interface ProviderConfig {
+  /** Billing/authentication route; never automatically fall back between routes. */
+  authMode?: 'api-key' | 'chatgpt-plan'
   /** Provider identifier */
   name: ProviderName
   /** Create a Vercel AI SDK model instance for the given model ID */

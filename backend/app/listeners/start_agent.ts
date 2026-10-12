@@ -224,8 +224,8 @@ export default class StartAgent {
       const userConfig = await userConfigService.getConfig(userId)
       const hasOverrides = hasUserLlmOverrides(userConfig)
 
-      if (hasOverrides) {
-        const provider = resolveProviderFromUserConfig(userConfig, { logger })
+      if (hasOverrides || agentConfig.openaiAuthMode === 'chatgpt-plan') {
+        const provider = resolveProviderFromUserConfig(userConfig, { logger, userId })
         agent.overrideProvider(provider)
         logger.info(
           {
@@ -238,6 +238,7 @@ export default class StartAgent {
         )
       }
     } catch (error) {
+      if (agentConfig.openaiAuthMode === 'chatgpt-plan') throw error
       logger.warn({ err: toError(error) }, 'Failed to read user LLM config, using default')
     }
   }
@@ -575,9 +576,6 @@ export default class StartAgent {
     // and to allow test overrides via the IoC container.
     const agent = await app.container.make(CanvasAgent)
 
-    // Apply per-user LLM overrides from user config before execution starts.
-    await this.applyUserLlmOverrides(agent, invocation.userId, logger)
-
     const cleanupRedis = await this.subscribeToInvocationCommands(invocation, agent, logger)
     let saver: AgentStateSaver | null = null
     let agentEventSubscription: AgentEventSubscription | null = null
@@ -630,6 +628,9 @@ export default class StartAgent {
         return
       }
       shouldDispatchInvocationCompleted = true
+      // Resolve actor-bound credentials inside the lifecycle guard so denial
+      // persists an error and releases the lease instead of stranding the task.
+      await this.applyUserLlmOverrides(agent, invocation.userId, logger)
       startHeartbeat()
       await applyPendingCancel()
 
