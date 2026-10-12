@@ -18,6 +18,10 @@ Kanwas still needs its normal local backend, database, Redis, Yjs server, fronte
 
 ## Authorize the local app
 
+To test just sign-in on macOS, double-click `try_chatgpt_signin.command` in Finder, or run it from Terminal. It opens the system browser with a fresh authorization attempt and keeps the callback listener alive for five minutes. This isolated test uses the local owner label `local-signin-test` and ignored credentials under `.chatgpt-plan/signin-test`; it does not require Docker or start the canvas. Run it only after installing the dependencies. A regular browser is the documented OAuth route; embedded-browser sign-in has not worked in the live test here.
+
+For the complete app, use the real Kanwas user ID and the separate commands below.
+
 Get the ID of the Kanwas user that will own this connection from the local app/database. It is a Kanwas ID, not your OpenAI email or account ID.
 
 ```sh
@@ -26,7 +30,7 @@ pnpm --filter backend chatgpt:status
 pnpm --filter backend chatgpt:models --user-id YOUR_KANWAS_USER_ID
 ```
 
-The sign-in command provides a URL for your system browser and starts a callback listener on `127.0.0.1`. You complete the sign-in and review the requested ChatGPT plan permission yourself. It creates a new Kanwas authorization; it does not reuse Codex credentials. Token files are protected locally under `~/.config/kanwas/chatgpt-plan` by default. Never put them in this repository, share them, or paste them into an API-key field.
+The sign-in command provides a URL for your system browser and starts a callback listener on `127.0.0.1`. You complete the sign-in and review the requested ChatGPT plan permission yourself. It creates a new Kanwas authorization; it does not reuse Codex credentials. Token files are protected locally under `~/.config/kanwas/chatgpt-plan` by default. Keep them in private, ignored local storage; never track or commit them, share them, or paste them into an API-key field.
 
 Pick a model slug returned by `chatgpt:models`, then explicitly test access:
 
