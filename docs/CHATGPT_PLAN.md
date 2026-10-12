@@ -4,6 +4,8 @@ This fork adds an experimental local OAuth provider for the ChatGPT subscription
 
 ## Set up the fork
 
+For the shortest canvas trial, use [the local launcher](LOCAL_TRIAL.md). It starts local infrastructure and walks through real Kanwas account registration and subscription authorization.
+
 Use Node 22 or newer and pnpm 10.11.0, matching the pinned package manager and upstream CI's major version:
 
 ```sh
@@ -65,7 +67,7 @@ Keep the user's provider selection as OpenAI. An existing per-user model overrid
 - Local function tools use the documented `additional_tools` input form; hosted tool support is limited by OpenAI's preview contract.
 - Failed, incomplete, aborted, or truncated streams cannot count as a successful response.
 - A valid SSE stream may omit its MIME header; the transport still validates events and requires completed inference. Explicit non-SSE media types are refused.
-- The pinned SDK currently classifies `gpt-6.1-sol` as non-reasoning and ignores its reasoning-effort setting. Text inference works; reasoning controls and history replay need separate validation.
+- The subscription provider explicitly enables the pinned SDK's reasoning mode for `gpt-6.1-sol`. Offline fixtures verify effort/summary settings and encrypted reasoning history replay; other slugs retain the SDK's existing behavior.
 - A tool may already have changed the board before a later stream fails. Failure handling does not roll back those edits; verify the board before retrying a side effect.
 - Existing task title, summary, structured-output, repair, and subagent paths carry the same auth mode/user checks.
 - This connection grants inference permission. It does not import your ChatGPT chats or memories.
@@ -83,6 +85,6 @@ If an interrupted process leaves the session busy, run `pnpm --filter backend ch
 
 ## Validation status
 
-All 65 offline tests pass, covering authorization validation, actor binding, request transformation, real SDK streaming fixtures, tool calls, token refresh, terminal failures, and headerless streams. A user-run system-browser sign-in, direct text probe, and production-provider text request succeeded on October 12, 2026 after the missing-MIME compatibility fix. These results do not establish successful Yjs board synchronization. The next acceptance checks are reasoning controls/history, a real local Kanwas user authorization, one board document edit, a follow-up turn, refresh, and cancellation.
+All 74 subscription/trial tests, the Docker build argument regression, and three private launcher configuration tests pass (78 total). They cover authorization validation, actor binding, request transformation, real SDK streaming fixtures, tool calls, token refresh, terminal failures, headerless streams, optional services, and reasoning history. A user-run system-browser sign-in, direct text probe, production-provider text request, and two-turn conversation succeeded on October 12, 2026. These results do not establish successful Yjs board synchronization. The next acceptance checks are the full local launcher, a real local Kanwas user authorization, one board document edit, a follow-up turn, refresh, and cancellation.
 
 Official references: [sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations), and [local/hosted scope](https://developers.openai.com/siwc/token-sharing-open-source).

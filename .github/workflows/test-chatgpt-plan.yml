@@ -8,6 +8,8 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/test-chatgpt-plan.yml'
+      - 'dev/local-trial/**'
+      - 'start_kanwas.command'
   push:
     branches: [chatgpt-plan]
 
@@ -29,3 +31,7 @@ jobs:
       - run: pnpm --filter backend typecheck
       - run: pnpm --filter backend typecheck:chatgpt-plan
       - run: pnpm --filter backend test:chatgpt-plan
+      - run: node --import tsx --test tests/sandbox/docker_build.test.ts
+        working-directory: backend
+      - run: node --test dev/local-trial/config.test.mjs
+      - run: bash -n start_kanwas.command

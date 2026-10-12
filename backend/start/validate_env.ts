@@ -18,6 +18,12 @@ interface RequiredEnvVar {
   getValue: () => string | undefined
 }
 
+const localTrial = env.get('KANWAS_LOCAL_TRIAL') === true
+if (localTrial && env.get('NODE_ENV') === 'production') {
+  console.error('KANWAS_LOCAL_TRIAL is only supported in development or tests; it is refused in production.')
+  process.exit(1)
+}
+
 const requiredEnvVars: RequiredEnvVar[] = [
   ...(env.get('OPENAI_AUTH_MODE') === 'chatgpt-plan'
     ? [
@@ -39,16 +45,20 @@ const requiredEnvVars: RequiredEnvVar[] = [
           getValue: () => env.get(DEFAULT_LLM_PROVIDER === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'),
         },
       ]),
-  {
-    name: 'COMPOSIO_API_KEY',
-    description: 'API key for Composio (agent tool integrations)',
-    getValue: () => env.get('COMPOSIO_API_KEY'),
-  },
-  {
-    name: 'PARALLEL_API_KEY',
-    description: 'API key for Parallel (web search)',
-    getValue: () => env.get('PARALLEL_API_KEY'),
-  },
+  ...(localTrial
+    ? []
+    : [
+        {
+          name: 'COMPOSIO_API_KEY',
+          description: 'API key for Composio (agent tool integrations)',
+          getValue: () => env.get('COMPOSIO_API_KEY'),
+        },
+        {
+          name: 'PARALLEL_API_KEY',
+          description: 'API key for Parallel (web search)',
+          getValue: () => env.get('PARALLEL_API_KEY'),
+        },
+      ]),
 ]
 
 function validateEnvironment(): void {

@@ -10,6 +10,6 @@ export default {
   parallelApiKey: env.get('PARALLEL_API_KEY'),
   assemblyaiApiKey: env.get('ASSEMBLYAI_API_KEY'),
   connectedExternalTools: {
-    enabled: true,
+    enabled: env.get('KANWAS_LOCAL_TRIAL') !== true || Boolean(env.get('COMPOSIO_API_KEY')?.trim()),
   },
 }

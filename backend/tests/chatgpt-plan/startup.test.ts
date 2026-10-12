@@ -32,6 +32,7 @@ function validate(overrides: Record<string, string>) {
           ANTHROPIC_API_KEY: '',
           OPENAI_API_KEY: '',
           OPENAI_AUTH_MODE: 'chatgpt-plan',
+          KANWAS_LOCAL_TRIAL: 'false',
           CHATGPT_PLAN_USER_ID: 'owner',
           CHATGPT_PLAN_MODEL: 'catalog-model',
           ...overrides,
@@ -55,6 +56,28 @@ test('subscription backend startup refuses a missing owner or model', () => {
   const model = validate({ CHATGPT_PLAN_MODEL: '' })
   assert.equal(model.status, 1)
   assert.match(model.stderr, /CHATGPT_PLAN_MODEL/)
+})
+
+test('ordinary startup still requires external integration and search keys', () => {
+  const result = validate({ COMPOSIO_API_KEY: '', PARALLEL_API_KEY: '' })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /COMPOSIO_API_KEY/)
+  assert.match(result.stderr, /PARALLEL_API_KEY/)
+})
+
+test('explicit local trial starts without vendor keys while retaining the subscription owner guard', () => {
+  const trial = { KANWAS_LOCAL_TRIAL: 'true', COMPOSIO_API_KEY: '', PARALLEL_API_KEY: '' }
+  const ready = validate(trial)
+  assert.equal(ready.status, 0, ready.stderr)
+  const missingOwner = validate({ ...trial, CHATGPT_PLAN_USER_ID: '' })
+  assert.equal(missingOwner.status, 1)
+  assert.match(missingOwner.stderr, /CHATGPT_PLAN_USER_ID/)
+})
+
+test('local trial is rejected in production even with all keys present', () => {
+  const result = validate({ NODE_ENV: 'production', KANWAS_LOCAL_TRIAL: 'true' })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /refused in production/)
 })
 
 test('API-key backend startup still requires its default OpenAI key', () => {

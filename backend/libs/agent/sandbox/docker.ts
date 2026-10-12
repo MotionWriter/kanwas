@@ -1,4 +1,4 @@
-import { exec, spawn, type ChildProcess } from 'node:child_process'
+import { exec, execFile, spawn, type ChildProcess } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { promisify } from 'node:util'
@@ -7,6 +7,7 @@ import { BaseSandbox, type SandboxMetrics } from './base.js'
 import type { SandboxInitOptions } from './types.js'
 
 const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 function findProjectRoot(): string {
   const currentDir = dirname(fileURLToPath(import.meta.url))
@@ -199,7 +200,7 @@ export class DockerSandbox extends BaseSandbox {
     // 1. Build image (from project root to include shared/)
     console.log(`[DockerSandbox] Building image ${imageName}...`)
     const dockerfilePath = join(buildContext, 'execenv', 'Dockerfile')
-    await execAsync(`docker build -t ${imageName} -f ${dockerfilePath} ${buildContext}`)
+    await execFileAsync('docker', ['build', '-t', imageName, '-f', dockerfilePath, buildContext])
 
     // 2. Start container in detached mode (keep alive with tail)
     const containerName = `kanwas-sandbox-${this.workspaceId}-${Date.now()}`

@@ -46,5 +46,12 @@ export function createChatGPTPlanProvider(
     supportsCaching: false,
     supportsNativeTools: false,
     promptOptions: () => ({}),
+    generationOptions(input) {
+      const options = provider.generationOptions(input)
+      // The pinned SDK's reasoning allowlist predates this live-tested slug.
+      // This also requests encrypted reasoning for stateless history replay.
+      if ((input.modelId?.trim() || model) !== 'gpt-6.1-sol') return options
+      return { ...options, openai: { ...options.openai, forceReasoning: true } }
+    },
   }
 }

@@ -107,6 +107,7 @@ export function getComposioEntityId(userId: string, workspaceId: string): string
  * @returns Tool Router in Vercel AI SDK format (ready for generateText)
  */
 export async function getComposioTools(userId: string, workspaceId: string): Promise<ToolRecord> {
+  if (env.get('KANWAS_LOCAL_TRIAL') === true && !env.get('COMPOSIO_API_KEY')?.trim()) return {}
   const entityId = getComposioEntityId(userId, workspaceId)
 
   try {

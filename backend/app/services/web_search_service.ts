@@ -1,6 +1,7 @@
 import type { WebSearchResult } from '#agent/types'
 import env from '#start/env'
 import Parallel from 'parallel-web'
+import { MissingServiceConfigurationError } from './missing_service_configuration.js'
 
 const MAX_RESULTS = 10
 const MAX_CHARS_PER_RESULT = 1500
@@ -23,10 +24,19 @@ export interface WebExtractError {
  * Simple web search service using Parallel.ai SDK
  */
 export default class WebSearchService {
-  private client: Parallel
+  private clientInstance?: Parallel
 
-  constructor(apiKey: string) {
-    this.client = new Parallel({ apiKey })
+  constructor(private apiKey?: string) {}
+
+  get enabled(): boolean {
+    return Boolean(this.apiKey?.trim())
+  }
+
+  private get client(): Parallel {
+    if (!this.enabled) {
+      throw new MissingServiceConfigurationError('Web search and web extraction', 'PARALLEL_API_KEY')
+    }
+    return (this.clientInstance ??= new Parallel({ apiKey: this.apiKey!.trim() }))
   }
 
   async search(objective: string, searchQueries?: string[], sessionId?: string): Promise<WebSearchResult[]> {
@@ -103,7 +113,7 @@ export default class WebSearchService {
 
   static create(): WebSearchService {
     const apiKey = env.get('PARALLEL_API_KEY')
-    if (!apiKey) {
+    if (!apiKey?.trim() && env.get('KANWAS_LOCAL_TRIAL') !== true) {
       throw new Error('PARALLEL_API_KEY environment variable is not set')
     }
     return new WebSearchService(apiKey)

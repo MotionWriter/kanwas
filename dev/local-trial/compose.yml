@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    ports: ['127.0.0.1:55432:5432']
+    environment:
+      POSTGRES_USER: kanwas
+      POSTGRES_DB: kanwas_local_trial
+      POSTGRES_PASSWORD: ${KANWAS_TRIAL_DB_PASSWORD:?Use start_kanwas.command}
+    volumes: ['postgres_data:/var/lib/postgresql']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kanwas -d kanwas_local_trial']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:8-alpine
+    ports: ['127.0.0.1:56379:6379']
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: ['redis_data:/data']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  postgres_data:
+  redis_data:

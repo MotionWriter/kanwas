@@ -36,8 +36,9 @@ export default await Env.create(new URL('../', import.meta.url), {
   REDIS_PORT: Env.schema.number(),
   REDIS_PASSWORD: Env.schema.string.optional(),
 
-  PARALLEL_API_KEY: Env.schema.string(),
-  COMPOSIO_API_KEY: Env.schema.string(),
+  KANWAS_LOCAL_TRIAL: Env.schema.boolean.optional(),
+  PARALLEL_API_KEY: Env.schema.string.optional(),
+  COMPOSIO_API_KEY: Env.schema.string.optional(),
   ANTHROPIC_API_KEY: Env.schema.string.optional(),
   OPENAI_API_KEY: Env.schema.string.optional(),
   OPENAI_BASE_URL: Env.schema.string.optional(),
