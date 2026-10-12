@@ -292,6 +292,71 @@ test('passes SSE bytes unchanged across one-byte chunks, CRLF and UTF-8 boundari
   assert.equal(await response.text(), sse(events, '\r\n'))
 })
 
+test('headerless valid SSE completes through the real SDK and receives a streaming content type', async () => {
+  const events = [
+    { type: 'response.created', response: { id: 'resp-headerless', model: 'offline-model', created_at: 1 } },
+    { type: 'response.output_item.added', output_index: 0, item: { type: 'message', id: 'msg-headerless' } },
+    { type: 'response.output_text.delta', item_id: 'msg-headerless', delta: 'Headerless stream completed.' },
+    { type: 'response.output_item.done', output_index: 0, item: { type: 'message', id: 'msg-headerless' } },
+    completed,
+  ]
+  const upstream = streamed(events, 1, '\r\n')
+  upstream.headers.delete('content-type')
+  let wrapped: Response | undefined
+  const transport = createChatGPTPlanFetch({ getAccessToken: async () => 'oauth-test', fetch: async () => upstream })
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    wrapped = await transport(input, init)
+    return wrapped
+  }
+  const stream = streamText({
+    model: createOpenAI({ apiKey: 'unused', fetch }).responses('offline-model'),
+    prompt: 'Say hello',
+    providerOptions: { openai: { store: false } },
+    maxRetries: 0,
+  })
+  const parts = await Array.fromAsync(stream.fullStream)
+  assert.equal(
+    parts.some((part) => part.type === 'error'),
+    false
+  )
+  assert.equal(await stream.text, 'Headerless stream completed.')
+  assert.equal(await stream.finishReason, 'stop')
+  assert.equal(wrapped?.headers.get('content-type'), 'text/event-stream')
+  assert.equal(wrapped?.headers.get('x-request-id'), 'req-offline')
+  assert.equal(upstream.headers.get('content-type'), null)
+})
+
+test('headerless HTML, JSON, malformed, incomplete and truncated responses remain rejected', async () => {
+  for (const body of [
+    '<html><body>Upstream error</body></html>',
+    JSON.stringify({ output: [] }),
+    'data: invalid\n\n',
+    sse([{ type: 'response.incomplete', response: { incomplete_details: { reason: 'max_output_tokens' } } }]),
+    sse([{ type: 'response.output_text.delta', item_id: 'm', delta: 'Partial' }]),
+    `data: ${JSON.stringify(completed)}`,
+  ]) {
+    const upstream = new Response(new TextEncoder().encode(body), { headers: { 'x-request-id': 'req-headerless' } })
+    assert.equal(upstream.headers.get('content-type'), null)
+    const response = await requestWith(upstream)
+    await assert.rejects(
+      response.text(),
+      (error: unknown) => error instanceof ChatGPTPlanTransportError && error.requestId === 'req-headerless'
+    )
+  }
+})
+
+test('accepts SSE media types case-insensitively while rejecting explicit non-SSE types', async () => {
+  const valid = streamed([completed])
+  valid.headers.set('content-type', 'TeXt/Event-Stream; charset=UTF-8')
+  const response = await requestWith(valid)
+  assert.equal(await response.text(), sse([completed]))
+  for (const contentType of ['application/json', 'text/html', 'text/plain', 'text/event-stream-extra', '']) {
+    const invalid = streamed([completed])
+    invalid.headers.set('content-type', contentType)
+    await assert.rejects(requestWith(invalid), /Expected a streaming Responses API result/)
+  }
+})
+
 test('fails on late usage-limit events and preserves their code/request ID', async () => {
   const response = await requestWith(
     streamed(

@@ -1,6 +1,6 @@
 # Local ChatGPT plan mode
 
-This fork adds an experimental local OAuth provider for the ChatGPT subscription route. It preserves Kanwas's existing canvas and agent. It is intended for one explicitly bound Kanwas user on macOS or Linux. Live sign-in, account entitlement, and a complete board edit have not yet been verified.
+This fork adds an experimental local OAuth provider for the ChatGPT subscription route. It preserves Kanwas's existing canvas and agent. It is intended for one explicitly bound Kanwas user on macOS or Linux. Live sign-in, account model listing, a direct streaming text probe, and text inference through the production provider have been verified with an isolated local test profile. A complete board edit has not yet been verified.
 
 ## Set up the fork
 
@@ -64,6 +64,8 @@ Keep the user's provider selection as OpenAI. An existing per-user model overrid
 - Unsupported tuning/cache fields are omitted. Unsupported state or tool forms fail with an explicit error.
 - Local function tools use the documented `additional_tools` input form; hosted tool support is limited by OpenAI's preview contract.
 - Failed, incomplete, aborted, or truncated streams cannot count as a successful response.
+- A valid SSE stream may omit its MIME header; the transport still validates events and requires completed inference. Explicit non-SSE media types are refused.
+- The pinned SDK currently classifies `gpt-6.1-sol` as non-reasoning and ignores its reasoning-effort setting. Text inference works; reasoning controls and history replay need separate validation.
 - A tool may already have changed the board before a later stream fails. Failure handling does not roll back those edits; verify the board before retrying a side effect.
 - Existing task title, summary, structured-output, repair, and subagent paths carry the same auth mode/user checks.
 - This connection grants inference permission. It does not import your ChatGPT chats or memories.
@@ -81,6 +83,6 @@ If an interrupted process leaves the session busy, run `pnpm --filter backend ch
 
 ## Validation status
 
-Offline checks cover authorization validation, actor binding, request transformation, real SDK streaming fixtures, tool calls, token refresh, and terminal failures. They do not establish live account eligibility or successful Yjs board synchronization. The next acceptance check is a live sign-in and probe, followed by one board document edit, follow-up turn, refresh, and cancellation.
+All 65 offline tests pass, covering authorization validation, actor binding, request transformation, real SDK streaming fixtures, tool calls, token refresh, terminal failures, and headerless streams. A user-run system-browser sign-in, direct text probe, and production-provider text request succeeded on October 12, 2026 after the missing-MIME compatibility fix. These results do not establish successful Yjs board synchronization. The next acceptance checks are reasoning controls/history, a real local Kanwas user authorization, one board document edit, a follow-up turn, refresh, and cancellation.
 
 Official references: [sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations), and [local/hosted scope](https://developers.openai.com/siwc/token-sharing-open-source).

@@ -35,7 +35,8 @@ Kanwas is a multiplayer workspace for AI work. Teams and an AI agent share the s
 
 This fork adds experimental [local ChatGPT subscription access](docs/CHATGPT_PLAN.md).
 Read that guide to use subscription authorization instead of an OpenAI API key.
-Live account access and a complete board-edit workflow still need validation.
+Live sign-in and a direct subscription text response have been verified;
+a complete board-edit workflow still needs validation.
 
 ### Prerequisites
 

@@ -234,7 +234,11 @@ export function prepareChatGPTPlanRequest(value: unknown): JsonRecord {
  */
 function guardCompletedStream(response: Response): Response {
   const requestId = response.headers.get('x-request-id')
-  if (!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
+  const contentType = response.headers.get('content-type')
+  const mediaType = contentType?.split(';', 1)[0].trim().toLowerCase()
+  // The public plan endpoint can omit Content-Type on a valid SSE response.
+  // Its body must still pass event parsing and response.completed checks below.
+  if (!response.body || (contentType !== null && mediaType !== 'text/event-stream')) {
     throw new ChatGPTPlanTransportError(
       'Expected a streaming Responses API result.',
       'chatgpt_plan_invalid_stream',
@@ -309,7 +313,9 @@ function guardCompletedStream(response: Response): Response {
       },
     })
   )
-  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
+  const headers = new Headers(response.headers)
+  if (contentType === null) headers.set('content-type', 'text/event-stream')
+  return new Response(body, { status: response.status, statusText: response.statusText, headers })
 }
 
 export function createChatGPTPlanFetch(options: ChatGPTPlanTransportOptions): typeof globalThis.fetch {
