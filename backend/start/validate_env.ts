@@ -10,6 +10,7 @@
 */
 
 import env from '#start/env'
+import { DEFAULT_LLM_PROVIDER } from 'shared/llm-config'
 
 interface RequiredEnvVar {
   name: string
@@ -18,12 +19,26 @@ interface RequiredEnvVar {
 }
 
 const requiredEnvVars: RequiredEnvVar[] = [
-  // Anthropic is the default provider — always required
-  {
-    name: 'ANTHROPIC_API_KEY',
-    description: 'API key for Anthropic (default LLM provider)',
-    getValue: () => env.get('ANTHROPIC_API_KEY'),
-  },
+  ...(env.get('OPENAI_AUTH_MODE') === 'chatgpt-plan'
+    ? [
+        {
+          name: 'CHATGPT_PLAN_USER_ID',
+          description: 'Kanwas user owning the local ChatGPT connection',
+          getValue: () => env.get('CHATGPT_PLAN_USER_ID'),
+        },
+        {
+          name: 'CHATGPT_PLAN_MODEL',
+          description: 'Model slug selected from the authorized ChatGPT catalog',
+          getValue: () => env.get('CHATGPT_PLAN_MODEL'),
+        },
+      ]
+    : [
+        {
+          name: DEFAULT_LLM_PROVIDER === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY',
+          description: 'API key for the default LLM provider',
+          getValue: () => env.get(DEFAULT_LLM_PROVIDER === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'),
+        },
+      ]),
   {
     name: 'COMPOSIO_API_KEY',
     description: 'API key for Composio (agent tool integrations)',

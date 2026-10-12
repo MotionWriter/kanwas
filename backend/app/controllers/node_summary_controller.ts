@@ -40,6 +40,7 @@ export default class NodeSummaryController {
     const userConfig = await this.userConfigService.getConfig(user.id)
     const provider = resolveProviderFromUserConfig(userConfig, {
       logger,
+      userId: user.id,
     })
     const llm = new LLM({
       provider,

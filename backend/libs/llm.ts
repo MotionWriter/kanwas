@@ -1,6 +1,7 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai'
 import { z } from 'zod'
 import type { ProviderConfig } from './agent/providers/types.js'
+import { consumeSuccessfulStream } from './agent/utils/tool_call_repair.js'
 
 export interface LLMConfig {
   provider: ProviderConfig
@@ -40,8 +41,12 @@ export class LLM {
       abortSignal: options.abortSignal,
     })
 
-    for await (const chunk of stream.fullStream) {
-      void chunk
+    if (this.provider.authMode === 'chatgpt-plan') {
+      await consumeSuccessfulStream(stream)
+    } else {
+      for await (const chunk of stream.fullStream) {
+        void chunk
+      }
     }
 
     return stream.text
@@ -79,8 +84,12 @@ export class LLM {
       abortSignal: options.abortSignal,
     })
 
-    for await (const chunk of stream.fullStream) {
-      void chunk
+    if (this.provider.authMode === 'chatgpt-plan') {
+      await consumeSuccessfulStream(stream)
+    } else {
+      for await (const chunk of stream.fullStream) {
+        void chunk
+      }
     }
 
     const steps = await stream.steps

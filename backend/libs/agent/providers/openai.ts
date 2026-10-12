@@ -55,7 +55,8 @@ export function createOpenAIProvider(
   const serviceTierOverride = normalizeOpenAIServiceTier(overrides.serviceTier)
   const modelTiers = resolveModelTiers(OPENAI_DEFAULT_MODEL_TIERS, modelOverride)
 
-  const customFetch = runtimeOptions.logger ? createOpenAILoggingFetch(runtimeOptions.logger) : undefined
+  const customFetch =
+    runtimeOptions.fetch ?? (runtimeOptions.logger ? createOpenAILoggingFetch(runtimeOptions.logger) : undefined)
 
   const openai = createOpenAI({
     apiKey,

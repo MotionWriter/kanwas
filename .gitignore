@@ -177,3 +177,6 @@ website/session/
 .opencode
 
 .kilo
+
+# Local ChatGPT-plan OAuth credentials (also excluded when using repo-local auth dir)
+.chatgpt-plan/

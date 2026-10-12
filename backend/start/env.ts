@@ -41,6 +41,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   ANTHROPIC_API_KEY: Env.schema.string.optional(),
   OPENAI_API_KEY: Env.schema.string.optional(),
   OPENAI_BASE_URL: Env.schema.string.optional(),
+  OPENAI_AUTH_MODE: Env.schema.enum.optional(['api-key', 'chatgpt-plan'] as const),
+  CHATGPT_PLAN_USER_ID: Env.schema.string.optional(),
+  CHATGPT_PLAN_MODEL: Env.schema.string.optional(),
+  KANWAS_CHATGPT_AUTH_DIR: Env.schema.string.optional(),
   GROQ_API_KEY: Env.schema.string.optional(),
 
   POSTHOG_QUERY_API_KEY: Env.schema.string.optional(),
