@@ -13,6 +13,8 @@ import { ThemeProvider } from '@/providers/theme'
 import { AuthProvider } from '@/providers/auth'
 import { KeyboardProvider } from '@/providers/keyboard'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { LocalTrialEntry } from '@/components/auth/LocalTrialEntry'
+import { isLocalTrial } from '@/lib/localTrialSession'
 import { ToastContainer } from '@/components/ui/Toast'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { PostHogTracker } from '@/providers/analytics/PostHogTracker'
@@ -127,41 +129,43 @@ export default function App() {
               <BrowserRouter basename={basename}>
                 <PostHogTracker />
                 <ToastContainer />
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/auth/callback" element={<OAuthCallback />} />
-                  <Route path="/invite/:token" element={<InviteAcceptPage />} />
-                  <Route path="/connections/callback" element={<ConnectionsCallback />} />
-                  <Route path="/embed" element={<EmbedBootstrap />} />
-                  <Route path="/share/:longHashId" element={<PublicDocumentSharePage />} />
-                  <Route
-                    path="/cli/authorize"
-                    element={
-                      <ProtectedRoute>
-                        <CliAuthPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <RootRedirect />
-                      </ProtectedRoute>
-                    }
-                  />
+                <LocalTrialEntry>
+                  <Routes>
+                    <Route path="/login" element={isLocalTrial ? <Navigate to="/" replace /> : <LoginPage />} />
+                    <Route path="/register" element={isLocalTrial ? <Navigate to="/" replace /> : <RegisterPage />} />
+                    <Route path="/auth/callback" element={<OAuthCallback />} />
+                    <Route path="/invite/:token" element={<InviteAcceptPage />} />
+                    <Route path="/connections/callback" element={<ConnectionsCallback />} />
+                    <Route path="/embed" element={<EmbedBootstrap />} />
+                    <Route path="/share/:longHashId" element={<PublicDocumentSharePage />} />
+                    <Route
+                      path="/cli/authorize"
+                      element={
+                        <ProtectedRoute>
+                          <CliAuthPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/"
+                      element={
+                        <ProtectedRoute>
+                          <RootRedirect />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  {/* Workspace route */}
-                  <Route
-                    path="/w/:workspaceId/*"
-                    element={
-                      <ProtectedRoute>
-                        <WorkspacePageWrapper />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
+                    {/* Workspace route */}
+                    <Route
+                      path="/w/:workspaceId/*"
+                      element={
+                        <ProtectedRoute>
+                          <WorkspacePageWrapper />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </LocalTrialEntry>
               </BrowserRouter>
             </PostHogProvider>
           </AuthProvider>

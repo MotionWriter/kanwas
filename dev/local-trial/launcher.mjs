@@ -1,10 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { access } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
-import { acquireLaunchLock, loadState, saveState, environments } from './config.mjs'
+import { acquireLaunchLock, loadState, saveState, environments, launchPasses, saveBrowserHandoff } from './config.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const node = process.execPath
@@ -12,7 +10,6 @@ const services = new Set()
 const expectedStops = new WeakSet()
 const shutdownSignal = new AbortController()
 let closing = false
-let terminal
 let releaseLock
 
 async function exists(path) {
@@ -92,7 +89,6 @@ async function shutdown() {
   if (closing) return
   closing = true
   shutdownSignal.abort()
-  terminal?.close()
   await Promise.all([...services].map(stopService))
   await releaseLock?.()
 }
@@ -120,62 +116,61 @@ async function waitFor(url) {
   throw new Error(`Service did not become ready at ${url}. Review the terminal output.`)
 }
 
-async function connectOwner(state, env) {
-  terminal = createInterface({ input: process.stdin, output: process.stdout })
-  console.log(
-    state.ownerId
-      ? '\nOpen http://localhost:15173 and sign in to your existing local Kanwas account.'
-      : '\nOpen http://localhost:15173/register in your regular browser and create your local Kanwas account.'
-  )
-  await terminal.question('After signing in to the local app, press Return here. ')
-  const email = (await terminal.question('Email used for your local Kanwas account: ')).trim()
-  terminal.close()
-  terminal = undefined
-  if (!email) throw new Error('A local Kanwas account email is required.')
-  const require = createRequire(join(root, 'backend', 'package.json'))
-  const { Client } = require('pg')
-  const client = new Client({
-    host: '127.0.0.1',
-    port: 55432,
-    user: 'kanwas',
-    password: state.databasePassword,
-    database: 'kanwas_local_trial',
+async function bootstrapOwner(state, passes) {
+  const response = await fetch('http://127.0.0.1:3333/local-trial/bootstrap', {
+    method: 'POST',
+    headers: { 'X-Kanwas-Local-Trial': passes.bootstrap },
+    signal: AbortSignal.timeout(30_000),
   })
-  let ownerId
-  try {
-    await client.connect()
-    const result = await client.query('SELECT id FROM users WHERE email = $1', [email])
-    ownerId = result.rows[0]?.id
-  } finally {
-    await client.end()
-  }
-  if (!ownerId) throw new Error('That account was not found. Create it in the local app before connecting ChatGPT.')
+  if (!response.ok) throw new Error('Automatic local workspace setup failed. Review the backend output.')
+  const result = await response.json()
+  if (result.userId !== state.ownerId || typeof result.workspaceId !== 'string')
+    throw new Error('The local workspace did not match the reserved trial identity.')
+  return result.workspaceId
+}
+
+async function connectOwner(state, env, { reconnect = false, canvasOnly = false } = {}) {
   const args = ['--import', 'tsx', 'scripts/chatgpt_plan_auth.ts']
-  console.log('Now authorize ChatGPT for this local Kanwas account in your regular browser.')
-  await run(node, [...args, 'signin', '--user-id', ownerId], { cwd: join(root, 'backend'), env })
-  const status = JSON.parse(
-    await run(node, [...args, 'status', '--user-id', ownerId], { cwd: join(root, 'backend'), env, capture: true })
-  )
-  if (!status.connected || !status.planUsageEnabled)
+  const options = { cwd: join(root, 'backend'), env, capture: true }
+  let status = JSON.parse(await run(node, [...args, 'status'], options))
+  if (status.connected && status.planUsageEnabled && status.kanwasUserId === 'local-signin-test') {
+    status = JSON.parse(await run(node, [...args, 'adopt-local-owner', '--user-id', state.ownerId], options))
+    console.log('Your existing ChatGPT connection is bound to this automatic local workspace.')
+  }
+  if (status.registered && status.kanwasUserId !== state.ownerId)
+    throw new Error('The saved ChatGPT connection belongs to a different workspace. It was preserved.')
+  if (!canvasOnly && (reconnect || !status.connected || !status.planUsageEnabled)) {
+    if (!process.stdin.isTTY)
+      throw new Error('Run start_kanwas.command in Terminal to authorize ChatGPT in your regular browser.')
+    console.log('Authorize ChatGPT for the local workspace in your regular browser. No local signup is needed.')
+    await run(node, [...args, 'signin', '--user-id', state.ownerId], { cwd: options.cwd, env })
+    status = JSON.parse(await run(node, [...args, 'status', '--user-id', state.ownerId], options))
+  }
+  if (!status.connected || !status.planUsageEnabled) {
+    if (canvasOnly) return false
     throw new Error('ChatGPT plan access was not granted. Restart the launcher to try again.')
-  const models = JSON.parse(
-    await run(node, [...args, 'models', '--user-id', ownerId], { cwd: join(root, 'backend'), env, capture: true })
-  )
-  const model = models.find((item) => item.slug === 'gpt-6.1-sol') ?? models[0]
-  if (!model) throw new Error('No visible ChatGPT models were returned.')
-  state.ownerId = ownerId
-  state.model = model.slug
-  await saveState(root, state)
+  }
+  const models = JSON.parse(await run(node, [...args, 'models', '--user-id', state.ownerId], options))
+  const model = models.find((item) => item.slug === state.model)
+  if (!model) throw new Error('The configured model is unavailable. The connection was preserved.')
   console.log(`ChatGPT connected. Model: ${model.display_name}.`)
+  return true
+}
+
+async function openLocalApp(url) {
+  const executable = process.platform === 'darwin' ? 'open' : 'xdg-open'
+  const result = spawnSync(executable, [url], { stdio: 'ignore', shell: false })
+  if (result.status !== 0)
+    console.log('The browser could not open. Restart this launcher after choosing a default browser.')
 }
 
 async function main() {
   const args = process.argv.slice(2)
   if (
     args.length &&
-    !(args.length === 1 && ['--check', '--stop-infra', '--reconnect', '--serve-only'].includes(args[0]))
+    !(args.length === 1 && ['--check', '--stop-infra', '--reconnect', '--serve-only', '--no-browser'].includes(args[0]))
   ) {
-    throw new Error('Usage: start_kanwas.command [--check|--stop-infra|--reconnect|--serve-only]')
+    throw new Error('Usage: start_kanwas.command [--check|--stop-infra|--reconnect|--serve-only|--no-browser]')
   }
   for (const file of [
     'backend/node_modules/tsx/package.json',
@@ -203,7 +198,8 @@ async function main() {
       .filter(Boolean)
       .join(':'),
   }
-  let env = environments(root, state, inherited)
+  const passes = launchPasses()
+  const env = environments(root, state, inherited, passes)
   const compose = ['compose', '-p', 'kanwas-local-trial', '-f', join(root, 'dev', 'local-trial', 'compose.yml')]
   if (args[0] === '--stop-infra') {
     await run(docker, [...compose, 'stop'], { env: env.docker })
@@ -217,7 +213,7 @@ async function main() {
     join(root, 'shared', 'tsconfig.json'),
   ])
   await run(node, ['ace.js', 'migration:run', '--force'], { cwd: join(root, 'backend'), env: env.backend })
-  let backend = startService('Backend', ['ace.js', 'serve'], env.backend, join(root, 'backend'))
+  startService('Backend', ['ace.js', 'serve'], env.backend, join(root, 'backend'))
   startService('Yjs', ['--import', 'tsx', 'src/index.ts'], env.yjs, join(root, 'yjs-server'))
   startService(
     'Frontend',
@@ -225,20 +221,19 @@ async function main() {
     env.frontend,
     join(root, 'frontend')
   )
-  await waitFor('http://localhost:3333/health')
-  await waitFor('http://localhost:1999/health')
-  await waitFor('http://localhost:15173')
-  if (args[0] !== '--serve-only' && (!state.ownerId || args[0] === '--reconnect')) {
-    if (!process.stdin.isTTY) throw new Error('First launch needs an interactive Terminal for account setup.')
-    await connectOwner(state, env.backend)
-    await stopService(backend)
-    env = environments(root, state, inherited)
-    backend = startService('Backend', ['ace.js', 'serve'], env.backend, join(root, 'backend'))
-    await waitFor('http://localhost:3333/health')
-  }
-  console.log('\nKanwas is ready at http://localhost:15173 — refresh the browser after connecting ChatGPT.')
-  if (args[0] === '--serve-only' && !state.ownerId)
-    console.log('Create your local account first; subscription agent access awaits owner authorization.')
+  await waitFor('http://127.0.0.1:3333/health')
+  await waitFor('http://127.0.0.1:1999/health')
+  await waitFor('http://127.0.0.1:15173')
+  await bootstrapOwner(state, passes)
+  const connected = await connectOwner(state, env.backend, {
+    reconnect: args[0] === '--reconnect',
+    canvasOnly: args[0] === '--serve-only',
+  })
+  await saveState(root, state)
+  await saveBrowserHandoff(root, passes.session)
+  if (args[0] !== '--no-browser') await openLocalApp(`http://localhost:15173/#local-trial-session=${passes.session}`)
+  console.log('\nYour local canvas is ready at http://localhost:15173. No local signup or password is needed.')
+  if (!connected) console.log('Canvas mode is available. Restart normally to authorize ChatGPT for AI actions.')
   console.log('Keep this terminal open. Press Ctrl+C to stop the app; your data stays saved.')
   await new Promise((resolve) => {
     const timer = setInterval(() => {

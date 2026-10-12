@@ -7,6 +7,7 @@ export const REQUESTED_SCOPES = ['openid', 'profile', 'email', 'offline_access',
 
 export type AuthErrorCode =
   | 'invalid_user'
+  | 'local_trial_disabled'
   | 'unsafe_storage'
   | 'invalid_storage'
   | 'busy'

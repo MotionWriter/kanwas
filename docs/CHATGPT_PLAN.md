@@ -1,10 +1,10 @@
 # Local ChatGPT plan mode
 
-This fork adds an experimental local OAuth provider for the ChatGPT subscription route. It preserves Kanwas's existing canvas and agent. It is intended for one explicitly bound Kanwas user on macOS or Linux. Live sign-in, account model listing, a direct streaming text probe, and text inference through the production provider have been verified with an isolated local test profile. A complete board edit has not yet been verified.
+This fork adds an experimental local OAuth provider for the ChatGPT subscription route. It preserves Kanwas's existing canvas and agent. It is intended for one explicitly bound Kanwas user on macOS or Linux. Live sign-in, account model listing, a direct streaming text probe, and text inference through the production provider have been verified with an isolated local test profile. The complete local app now opens without signup, and an agent-created board document and a same-task follow-up edit have persisted after refresh.
 
 ## Set up the fork
 
-For the shortest canvas trial, use [the local launcher](LOCAL_TRIAL.md). It starts local infrastructure and walks through real Kanwas account registration and subscription authorization.
+For the shortest canvas trial, use [the local launcher](LOCAL_TRIAL.md). It starts local infrastructure, creates the internal workspace identity automatically, and opens the canvas without local registration. An existing isolated sign-in grant is explicitly bound to that identity; a fresh installation asks only for ChatGPT authorization.
 
 Use Node 22 or newer and pnpm 10.11.0, matching the pinned package manager and upstream CI's major version:
 

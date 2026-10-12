@@ -4,6 +4,11 @@ import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createProviderFromConfig } from '../../libs/agent/providers/index.js'
 import { createChatGPTPlanFetch } from '../../libs/agent/providers/chatgpt_plan_transport.js'
+import { CredentialStore } from '../../libs/chatgpt-plan-auth/store.js'
+import { OPENAI_ISSUER, PLAN_SCOPE } from '../../libs/chatgpt-plan-auth/types.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const config = {
   openaiAuthMode: 'chatgpt-plan' as const,
@@ -147,4 +152,82 @@ test('verified subscription reasoning options reach the SDK and survive stateles
     false
   )
   assert.ok(requests.every((request) => request.store === false && request.stream === true))
+})
+
+test('the production subscription provider pins the official absolute Responses URL with an empty inherited base URL', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kanwas-provider-base-url-'))
+  const store = new CredentialStore(directory)
+  await store.withLock(() =>
+    store.write({
+      version: 1,
+      extAgentHostId: 'urn:uuid:8a4b755e-6c32-4b78-9373-ad003290fdee',
+      connection: {
+        kanwasUserId: config.chatgptPlanUserId,
+        issuer: OPENAI_ISSUER,
+        subject: 'verified-offline-subject',
+        clientId: 'oaiapp_offline_registration',
+        tokens: {
+          accessToken: 'fake-provider-access',
+          tokenType: 'Bearer',
+          scopes: [PLAN_SCOPE],
+          expiresAt: Date.now() + 3600_000,
+          savedAt: new Date().toISOString(),
+        },
+      },
+    })
+  )
+  const previousBaseUrl = process.env.OPENAI_BASE_URL
+  const previousDirectory = process.env.KANWAS_CHATGPT_AUTH_DIR
+  const previousFetch = globalThis.fetch
+  const requestedUrls: string[] = []
+  try {
+    process.env.OPENAI_BASE_URL = ''
+    process.env.KANWAS_CHATGPT_AUTH_DIR = directory
+    globalThis.fetch = async (input, init) => {
+      requestedUrls.push(String(input))
+      assert.equal(String(input), 'https://api.openai.com/v1/responses')
+      assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer fake-provider-access')
+      const events = [
+        { type: 'response.created', response: { id: 'resp-absolute', model: config.chatgptPlanModel, created_at: 1 } },
+        { type: 'response.output_item.added', output_index: 0, item: { type: 'message', id: 'msg-absolute' } },
+        { type: 'response.output_text.delta', item_id: 'msg-absolute', delta: 'Official route ready.' },
+        { type: 'response.output_item.done', output_index: 0, item: { type: 'message', id: 'msg-absolute' } },
+        {
+          type: 'response.completed',
+          response: { incomplete_details: null, usage: { input_tokens: 3, output_tokens: 2 } },
+        },
+      ]
+      return new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    }
+    const provider = createProviderFromConfig(
+      { ...config, openaiBaseUrl: '' },
+      {},
+      { userId: config.chatgptPlanUserId }
+    )
+    const result = streamText({
+      model: provider.createModel(config.chatgptPlanModel),
+      prompt: 'Exercise the official offline route.',
+      providerOptions: provider.generationOptions({ modelId: config.chatgptPlanModel, flowHint: 'utility' }) as any,
+      maxRetries: 0,
+    })
+    for await (const chunk of result.fullStream) {
+      if (chunk.type === 'error') throw chunk.error
+    }
+    assert.equal(await result.text, 'Official route ready.')
+    assert.equal(await result.finishReason, 'stop')
+    assert.deepEqual(requestedUrls, ['https://api.openai.com/v1/responses'])
+    assert.throws(
+      () => createProviderFromConfig({ ...config, openaiBaseUrl: 'https://example.invalid/v1' }),
+      /official OpenAI endpoint/
+    )
+  } finally {
+    globalThis.fetch = previousFetch
+    if (previousBaseUrl === undefined) delete process.env.OPENAI_BASE_URL
+    else process.env.OPENAI_BASE_URL = previousBaseUrl
+    if (previousDirectory === undefined) delete process.env.KANWAS_CHATGPT_AUTH_DIR
+    else process.env.KANWAS_CHATGPT_AUTH_DIR = previousDirectory
+    await rm(directory, { recursive: true, force: true })
+  }
 })

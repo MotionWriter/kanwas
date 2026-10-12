@@ -315,6 +315,49 @@ export class ChatGPTPlanAuth {
     return connectionStatus(state?.connection)
   }
 
+  /** Explicit local-test transition; the same registration, account, and rotating token record are retained. */
+  async adoptLocalTrialOwner(kanwasUserId: string): Promise<ConnectionStatus> {
+    if (process.env.NODE_ENV !== 'development' || process.env.KANWAS_LOCAL_TRIAL !== 'true') {
+      throw new ChatGPTPlanAuthError(
+        'local_trial_disabled',
+        'Local trial owner adoption requires development mode and KANWAS_LOCAL_TRIAL=true.'
+      )
+    }
+    if (
+      typeof kanwasUserId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(kanwasUserId)
+    ) {
+      throw new ChatGPTPlanAuthError('invalid_user', 'Supply the generated local trial user UUID.')
+    }
+    if (process.env.KANWAS_LOCAL_TRIAL_USER_ID !== kanwasUserId) {
+      throw new ChatGPTPlanAuthError('wrong_user', 'The adoption target must match the generated local trial identity.')
+    }
+    return this.store.withLock(async () => {
+      const state = await this.store.read()
+      const connection = state?.connection
+      if (!connection?.tokens) {
+        throw new ChatGPTPlanAuthError('not_connected', 'Complete the isolated local ChatGPT sign-in test first.')
+      }
+      if (connection.kanwasUserId !== 'local-signin-test' && connection.kanwasUserId !== kanwasUserId) {
+        throw new ChatGPTPlanAuthError(
+          'wrong_user',
+          'Only the isolated sign-in test or this same local trial owner can be adopted.'
+        )
+      }
+      if (!connection.tokens.scopes.includes(PLAN_SCOPE)) {
+        throw new ChatGPTPlanAuthError(
+          'plan_permission_missing',
+          'The isolated ChatGPT connection has no permission to use your plan.'
+        )
+      }
+      if (connection.kanwasUserId !== kanwasUserId) {
+        connection.kanwasUserId = kanwasUserId
+        await this.store.write(state!)
+      }
+      return connectionStatus(connection)
+    })
+  }
+
   async getAccessToken(kanwasUserId: string): Promise<string> {
     validateKanwasUserId(kanwasUserId)
     return this.store.withLock(async () => {

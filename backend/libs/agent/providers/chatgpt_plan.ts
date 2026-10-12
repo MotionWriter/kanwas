@@ -1,4 +1,5 @@
 import { getAccessToken } from '../../chatgpt-plan-auth/index.js'
+import { OPENAI_RESOURCE } from '../../chatgpt-plan-auth/types.js'
 import { createChatGPTPlanFetch } from './chatgpt_plan_transport.js'
 import { createOpenAIProvider } from './openai.js'
 import type { ProviderCredentialConfig } from './index.js'
@@ -37,7 +38,9 @@ export function createChatGPTPlanProvider(
           return getAccessToken(runtime.userId)
         },
       }),
-    }
+    },
+    // An empty inherited OPENAI_BASE_URL otherwise becomes the SDK's base URL.
+    OPENAI_RESOURCE
   )
 
   return {

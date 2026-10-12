@@ -23,15 +23,17 @@ async function main(): Promise<void> {
   const command = positionals[0]
   if (values.help || !command) {
     console.log(
-      'Kanwas local ChatGPT plan connection (macOS/Linux)\n\nCommands: signin, status, disconnect, models, probe, recover-lock\nUse --user-id <Kanwas user ID> for signin/disconnect/models/probe.\nprobe also requires --model <slug from models>.\nrecover-lock removes only a session lock whose owner process is confirmed stopped.\nNo API key or existing Codex credentials are used.'
+      'Kanwas local ChatGPT plan connection (macOS/Linux)\n\nCommands: signin, status, disconnect, models, probe, recover-lock, adopt-local-owner\nUse --user-id <Kanwas user ID> for signin/disconnect/models/probe.\nprobe also requires --model <slug from models>.\nrecover-lock removes only a session lock whose owner process is confirmed stopped.\nadopt-local-owner binds the isolated sign-in test to a generated local trial UUID in development mode only.\nNo API key or existing Codex credentials are used.'
     )
     return
   }
   if (
     positionals.length !== 1 ||
-    !['signin', 'status', 'disconnect', 'models', 'probe', 'recover-lock'].includes(command)
+    !['signin', 'status', 'disconnect', 'models', 'probe', 'recover-lock', 'adopt-local-owner'].includes(command)
   ) {
-    throw new Error('Choose signin, status, disconnect, models, probe, or recover-lock. Use --help for usage.')
+    throw new Error(
+      'Choose signin, status, disconnect, models, probe, recover-lock, or adopt-local-owner. Use --help for usage.'
+    )
   }
   const auth = new ChatGPTPlanAuth()
   if (command === 'recover-lock') {
@@ -44,6 +46,10 @@ async function main(): Promise<void> {
     return
   }
   if (!userId) throw new Error('Supply --user-id with the explicit Kanwas user ID to bind this ChatGPT connection.')
+  if (command === 'adopt-local-owner') {
+    console.log(JSON.stringify(await auth.adoptLocalTrialOwner(userId), null, 2))
+    return
+  }
   if (command === 'signin') {
     console.log('Continue with ChatGPT in your browser. Sign-in waits up to five minutes.')
     const status = await auth.signIn(userId, openBrowser)

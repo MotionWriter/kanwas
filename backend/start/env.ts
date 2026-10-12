@@ -37,6 +37,9 @@ export default await Env.create(new URL('../', import.meta.url), {
   REDIS_PASSWORD: Env.schema.string.optional(),
 
   KANWAS_LOCAL_TRIAL: Env.schema.boolean.optional(),
+  KANWAS_LOCAL_TRIAL_USER_ID: Env.schema.string.optional(),
+  KANWAS_LOCAL_TRIAL_BOOTSTRAP_SECRET: Env.schema.string.optional(),
+  KANWAS_LOCAL_TRIAL_SESSION_SECRET: Env.schema.string.optional(),
   PARALLEL_API_KEY: Env.schema.string.optional(),
   COMPOSIO_API_KEY: Env.schema.string.optional(),
   ANTHROPIC_API_KEY: Env.schema.string.optional(),

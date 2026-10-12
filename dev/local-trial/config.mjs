@@ -61,7 +61,7 @@ export async function loadState(root) {
       appKey: randomBytes(24).toString('base64url'),
       apiSecret: randomBytes(32).toString('hex'),
       databasePassword: randomBytes(32).toString('hex'),
-      ownerId: null,
+      ownerId: randomUUID(),
       model: 'gpt-6.1-sol',
     }
     await saveState(root, state)
@@ -88,10 +88,35 @@ export async function loadState(root) {
   ) {
     throw new Error('Local trial configuration is invalid; do not delete it if you need existing data.')
   }
+  if (state.ownerId === null) {
+    state.ownerId = randomUUID()
+    await saveState(root, state)
+  }
   return state
 }
 
-export function environments(root, state, inherited = {}) {
+export function launchPasses() {
+  return { bootstrap: randomBytes(32).toString('hex'), session: randomBytes(32).toString('hex') }
+}
+
+export async function saveBrowserHandoff(root, session) {
+  if (!/^[a-f0-9]{64}$/.test(session)) throw new Error('Invalid local browser handoff.')
+  const directory = join(root, '.local-trial')
+  await privateDirectory(directory)
+  const path = join(directory, 'browser-handoff.json')
+  const temporary = join(directory, `.handoff-${randomUUID()}`)
+  try {
+    await writeFile(temporary, JSON.stringify({ url: `http://localhost:15173/#local-trial-session=${session}` }), {
+      flag: 'wx',
+      mode: 0o600,
+    })
+    await rename(temporary, path)
+  } finally {
+    await unlink(temporary).catch(() => {})
+  }
+}
+
+export function environments(root, state, inherited = {}, passes = {}) {
   const common = {
     ...inherited,
     NODE_ENV: 'development',
@@ -120,10 +145,13 @@ export function environments(root, state, inherited = {}) {
       REDIS_USER: 'default',
       REDIS_PASSWORD: '',
       KANWAS_LOCAL_TRIAL: 'true',
+      KANWAS_LOCAL_TRIAL_USER_ID: state.ownerId,
+      KANWAS_LOCAL_TRIAL_BOOTSTRAP_SECRET: passes.bootstrap ?? '',
+      KANWAS_LOCAL_TRIAL_SESSION_SECRET: passes.session ?? '',
       OPENAI_AUTH_MODE: 'chatgpt-plan',
       CHATGPT_PLAN_USER_ID: state.ownerId ?? 'local-trial-pending-owner',
       CHATGPT_PLAN_MODEL: state.model,
-      KANWAS_CHATGPT_AUTH_DIR: join(root, '.local-trial', 'chatgpt'),
+      KANWAS_CHATGPT_AUTH_DIR: join(root, '.chatgpt-plan', 'signin-test'),
       OPENAI_API_KEY: '',
       OPENAI_BASE_URL: '',
       ANTHROPIC_API_KEY: '',
@@ -159,6 +187,7 @@ export function environments(root, state, inherited = {}) {
       VITE_API_URL: 'http://localhost:3333',
       VITE_YJS_SERVER_URL: 'localhost:1999',
       VITE_AUTH_TOKEN_KEY: 'kanwas_local_trial_token',
+      VITE_LOCAL_TRIAL: 'true',
     },
     docker: { ...common, KANWAS_TRIAL_DB_PASSWORD: state.databasePassword },
   }

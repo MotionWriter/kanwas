@@ -1,4 +1,4 @@
-import { exec, execFile, spawn, type ChildProcess } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { promisify } from 'node:util'
@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url'
 import { BaseSandbox, type SandboxMetrics } from './base.js'
 import type { SandboxInitOptions } from './types.js'
 
-const execAsync = promisify(exec)
 const execFileAsync = promisify(execFile)
 
 function findProjectRoot(): string {
@@ -215,21 +214,47 @@ export class DockerSandbox extends BaseSandbox {
     const yjsServerHost = rawYjsServerHost.replace(/^localhost(:\d+)?$/, 'host.docker.internal$1')
     const backendUrl = this.config.backendUrl.replace(/localhost(:\d+)?/, 'host.docker.internal$1')
 
-    const { stdout } = await execAsync(
-      `docker run -d ` +
-        `--name ${containerName} ` +
-        `-e WORKSPACE_ID=${this.workspaceId} ` +
-        `-e YJS_SERVER_HOST=${yjsServerHost} ` +
-        `-e YJS_SERVER_PROTOCOL=${this.config.yjsServerProtocol ?? 'ws'} ` +
-        `-e BACKEND_URL=${backendUrl} ` +
-        `-e AUTH_TOKEN=${options.authToken} ` +
-        `-e ASSEMBLYAI_API_KEY=${this.config.assemblyaiApiKey ?? ''} ` +
-        `-e USER_ID=${options.userId} ` +
-        `-e CORRELATION_ID=${options.correlationId} ` +
-        `-e SENTRY_DSN=${this.config.sentryDsn ?? ''} ` +
-        `${imageName} ` +
-        `tail -f /dev/null`
-    )
+    // Docker reads named variables from its environment. Credentials must never enter command argv or errors.
+    const containerEnvironment = {
+      WORKSPACE_ID: options.workspaceId,
+      YJS_SERVER_HOST: yjsServerHost,
+      YJS_SERVER_PROTOCOL: this.config.yjsServerProtocol ?? 'ws',
+      BACKEND_URL: backendUrl,
+      AUTH_TOKEN: options.authToken,
+      ASSEMBLYAI_API_KEY: this.config.assemblyaiApiKey ?? '',
+      USER_ID: options.userId,
+      CORRELATION_ID: options.correlationId,
+      SENTRY_DSN: this.config.sentryDsn ?? '',
+    }
+    let stdout: string
+    try {
+      const result = await execFileAsync(
+        'docker',
+        [
+          'run',
+          '-d',
+          '--name',
+          containerName,
+          ...Object.keys(containerEnvironment).flatMap((name) => ['-e', name]),
+          imageName,
+          'tail',
+          '-f',
+          '/dev/null',
+        ],
+        { env: { ...process.env, ...containerEnvironment } }
+      )
+      stdout = result.stdout
+    } catch (error) {
+      const exitCode =
+        error && typeof error === 'object' && 'code' in error && typeof error.code === 'number' ? error.code : null
+      // Docker stderr and child-process errors may contain credential values; do not retain them as a cause.
+      throw new Error(
+        `Docker sandbox startup failed${exitCode === null ? '' : ` (exit ${exitCode})`}. Check Docker Desktop and retry.`
+      )
+    }
+    if (!/^[a-f0-9]{12,64}$/i.test(stdout.trim())) {
+      throw new Error('Docker sandbox startup returned an invalid container ID. Check Docker Desktop and retry.')
+    }
 
     this.containerId = stdout.trim()
     options.onSandboxId?.(this.containerId)
@@ -261,8 +286,8 @@ export class DockerSandbox extends BaseSandbox {
       this.ready = false
 
       console.log(`[DockerSandbox] Shutting down container ${containerId}...`)
-      await execAsync(`docker stop ${containerId}`).catch(() => {})
-      await execAsync(`docker rm ${containerId}`).catch(() => {})
+      await execFileAsync('docker', ['stop', containerId]).catch(() => {})
+      await execFileAsync('docker', ['rm', containerId]).catch(() => {})
       console.log(`[DockerSandbox] Container stopped and removed`)
     }
   }
