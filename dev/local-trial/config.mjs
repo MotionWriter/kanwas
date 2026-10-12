@@ -95,6 +95,7 @@ export function environments(root, state, inherited = {}) {
   const common = {
     ...inherited,
     NODE_ENV: 'development',
+    DOCKER_CONTEXT: 'desktop-linux',
     SENTRY_DSN: '',
     ENV_PATH: join(root, '.local-trial', 'backend-env'),
   }

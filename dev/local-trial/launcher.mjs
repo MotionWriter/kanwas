@@ -124,8 +124,8 @@ async function connectOwner(state, env) {
   terminal = createInterface({ input: process.stdin, output: process.stdout })
   console.log(
     state.ownerId
-      ? '\nOpen http://localhost:5173 and sign in to your existing local Kanwas account.'
-      : '\nOpen http://localhost:5173/register in your regular browser and create your local Kanwas account.'
+      ? '\nOpen http://localhost:15173 and sign in to your existing local Kanwas account.'
+      : '\nOpen http://localhost:15173/register in your regular browser and create your local Kanwas account.'
   )
   await terminal.question('After signing in to the local app, press Return here. ')
   const email = (await terminal.question('Email used for your local Kanwas account: ')).trim()
@@ -171,8 +171,11 @@ async function connectOwner(state, env) {
 
 async function main() {
   const args = process.argv.slice(2)
-  if (args.length && !(args.length === 1 && ['--check', '--stop-infra', '--reconnect'].includes(args[0]))) {
-    throw new Error('Usage: start_kanwas.command [--check|--stop-infra|--reconnect]')
+  if (
+    args.length &&
+    !(args.length === 1 && ['--check', '--stop-infra', '--reconnect', '--serve-only'].includes(args[0]))
+  ) {
+    throw new Error('Usage: start_kanwas.command [--check|--stop-infra|--reconnect|--serve-only]')
   }
   for (const file of [
     'backend/node_modules/tsx/package.json',
@@ -186,7 +189,7 @@ async function main() {
   const docker = await findDocker()
   if (spawnSync(docker, ['compose', 'version'], { stdio: 'ignore' }).status !== 0)
     throw new Error('Docker Compose is required.')
-  if (spawnSync(docker, ['info'], { stdio: 'ignore' }).status !== 0)
+  if (spawnSync(docker, ['--context', 'desktop-linux', 'info'], { stdio: 'ignore' }).status !== 0)
     throw new Error('Start Docker Desktop and wait for its engine, then run this launcher again.')
   if (args[0] === '--check') {
     console.log('Node, dependencies, Docker and Compose are ready.')
@@ -218,14 +221,14 @@ async function main() {
   startService('Yjs', ['--import', 'tsx', 'src/index.ts'], env.yjs, join(root, 'yjs-server'))
   startService(
     'Frontend',
-    ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5173', '--strictPort'],
+    ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '15173', '--strictPort'],
     env.frontend,
     join(root, 'frontend')
   )
   await waitFor('http://localhost:3333/health')
   await waitFor('http://localhost:1999/health')
-  await waitFor('http://localhost:5173')
-  if (!state.ownerId || args[0] === '--reconnect') {
+  await waitFor('http://localhost:15173')
+  if (args[0] !== '--serve-only' && (!state.ownerId || args[0] === '--reconnect')) {
     if (!process.stdin.isTTY) throw new Error('First launch needs an interactive Terminal for account setup.')
     await connectOwner(state, env.backend)
     await stopService(backend)
@@ -233,7 +236,9 @@ async function main() {
     backend = startService('Backend', ['ace.js', 'serve'], env.backend, join(root, 'backend'))
     await waitFor('http://localhost:3333/health')
   }
-  console.log('\nKanwas is ready at http://localhost:5173 — refresh the browser after connecting ChatGPT.')
+  console.log('\nKanwas is ready at http://localhost:15173 — refresh the browser after connecting ChatGPT.')
+  if (args[0] === '--serve-only' && !state.ownerId)
+    console.log('Create your local account first; subscription agent access awaits owner authorization.')
   console.log('Keep this terminal open. Press Ctrl+C to stop the app; your data stays saved.')
   await new Promise((resolve) => {
     const timer = setInterval(() => {
